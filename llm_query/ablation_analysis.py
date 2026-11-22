@@ -16,9 +16,10 @@ from tqdm import tqdm
 from llm_query.LLM_analysis import (
     _flush_results_to_csv,
     _load_processed_case_ids,
+    generate_prompt,
     parse_llm_response,
 )
-from llm_query.securellm_adapter import query_llm
+from llm_query.securellm_adapter import ModelConfig, query_llm
 
 logger = logging.getLogger(__name__)
 
@@ -135,8 +136,8 @@ def generate_ablation_prompt(
 ) -> str:
     """Generate prompt with demographics section for ablation analysis.
 
-    Uses the same prompt template as the notebook ablation study, with lowercase
-    JSON keys to be compatible with the existing parse_llm_response.
+    Uses the shared generate_prompt from LLM_analysis.py (same prompt as the
+    main analysis), with the demographics block added.
 
     Args:
         case_id: Case identifier.
@@ -147,58 +148,12 @@ def generate_ablation_prompt(
     Returns:
         Complete prompt string.
     """
-    has_radiology = (
-        radiology_text
-        and radiology_text.strip()
-        and radiology_text != "No radiology reports available."
+    return generate_prompt(
+        case_id=case_id,
+        progress_text=progress_text,
+        radiology_text=radiology_text,
+        demographics=demographics,
     )
-    radiology_section = (
-        f"- Radiology Report: {radiology_text}"
-        if has_radiology
-        else "- Radiology Report: Not available."
-    )
-
-    prompt = f"""
-    === OBJECTIVE ===
-    You are an expert otolaryngologist evaluating an ENT case.
-    Decide **only** whether surgery is recommended based on the information provided.
-
-    === INSTRUCTIONS ===
-    1. Rely strictly on the case details below (do not invent information).
-    2. Respond with a single **valid JSON object** — no extra text, headings, or explanations outside the JSON.
-    3. Follow the schema exactly.
-    4. For confidence, choose **one integer value (1-10)** from the Confidence Scale. Do not output ranges or text.
-
-    === CONFIDENCE SCALE (1-10) ===
-    1 = no confidence (likely wrong)
-    3-4 = low (uncertain, weak support)
-    5 = moderate (plausible but partly speculative)
-    6-7 = fairly confident (reasonable but some gaps/hedging)
-    8 = high (well supported, minor uncertainty)
-    9 = very high (strong reasoning, unlikely error)
-    10 = certain (clear, fully supported, no doubt)
-
-    === CASE DETAILS ===
-    - Case ID: {case_id}
-
-    === PATIENT DEMOGRAPHICS ===
-    {demographics}
-
-    === CLINICAL INFORMATION ===
-    - Clinical Summary: {progress_text}
-    {radiology_section}
-
-    === OUTPUT SCHEMA ===
-    Respond **only** using the JSON structure below. Do not repeat or paraphrase the instructions, and do not include introductory
-    or closing comments. Your output must begin and end with a single valid JSON object:
-
-    {{
-      "decision": "Yes" | "No",
-      "confidence": 1-10,
-      "reasoning": "2-3 sentences explaining the decision (max 100 words)."
-    }}
-    """
-    return prompt
 
 
 def process_ablation_case(
@@ -248,7 +203,7 @@ def process_ablation_case(
                     "Provide a surgical recommendation in the requested JSON format."
                 ),
                 temperature=0.2,
-                max_tokens=2048,
+                max_tokens=ModelConfig.MAX_OUTPUT_TOKENS,
                 model_name=model_name,
             )
             result["api_response"] = response

@@ -7,7 +7,7 @@ import os
 from typing import Dict, Any, Optional, Set
 from tqdm import tqdm
 
-from llm_query.securellm_adapter import query_llm, SecureLLMClient
+from llm_query.securellm_adapter import ModelConfig, query_llm, SecureLLMClient
 
 
 def query_openai(prompt: str, client=None) -> str:
@@ -28,33 +28,55 @@ def query_openai(prompt: str, client=None) -> str:
         prompt=prompt,
         system_message="You are an expert otolaryngologist. Provide a surgical recommendation in the requested JSON format.",
         temperature=0.2,
-        max_tokens=2048  # Increased to avoid truncation
+        max_tokens=ModelConfig.MAX_OUTPUT_TOKENS
     )
 
-def generate_prompt(case_id: str, progress_text: str, radiology_text: str) -> str:
-    """Generates a structured prompt for the LLM."""
+def generate_prompt(case_id: str, progress_text: str, radiology_text: str, demographics: Optional[str] = None) -> str:
+    """Generates a structured prompt for the LLM (shared by main and ablation runs)."""
 
     # Check if radiology text is available
     has_radiology = radiology_text and radiology_text.strip() and radiology_text != "No radiology reports available."
     radiology_section = f"- Radiology Report: {radiology_text}" if has_radiology else "- Radiology Report: Not available."
 
-    prompt = f"""
-    You are an expert otolaryngologist evaluating an ENT case.
-    Based ONLY on the information provided below, make a recommendation on surgery.
+    # Demographics are only included for the ablation study
+    demographics_section = f"\n    === PATIENT DEMOGRAPHICS ===\n    {demographics}\n" if demographics else ""
 
-    --- Case Details ---
+    prompt = f"""
+    === OBJECTIVE ===
+    You are an expert otolaryngologist evaluating an ENT case.
+    Decide **only** whether surgery is recommended based on the information provided.
+
+    === INSTRUCTIONS ===
+    1. Rely strictly on the case details below (do not invent information).
+    2. Respond with a single **valid JSON object** — no extra text, headings, or explanations outside the JSON.
+    3. Follow the schema exactly.
+    4. For confidence, choose **one integer value (1-10)** from the Confidence Scale. Do not output ranges or text.
+
+    === CONFIDENCE SCALE (1-10) ===
+    1 = no confidence (likely wrong)
+    3-4 = low (uncertain, weak support)
+    5 = moderate (plausible but partly speculative)
+    6-7 = fairly confident (reasonable but some gaps/hedging)
+    8 = high (well supported, minor uncertainty)
+    9 = very high (strong reasoning, unlikely error)
+    10 = certain (clear, fully supported, no doubt)
+
+    === CASE DETAILS ===
     - Case ID: {case_id}
-    - Clinical Summary from ENT Notes: {progress_text}
+    {demographics_section}
+    === CLINICAL INFORMATION ===
+    - Clinical Summary: {progress_text}
     {radiology_section}
 
-    ---
+    === OUTPUT SCHEMA ===
+    Respond **only** using the JSON structure below. Do not repeat or paraphrase the instructions, and do not include introductory
+    or closing comments. Your output must begin and end with a single valid JSON object:
 
-    Provide your response as a JSON object with three keys:
-    1. "decision": Your recommendation, either "Yes" or "No".
-    2. "confidence": Your confidence level from 1 (not confident) to 10 (very confident).
-    3. "reasoning": A brief, 2-4 sentence explanation for your decision.
-
-    Return ONLY the JSON object, no additional text.
+    {{
+      "decision": "Yes" | "No",
+      "confidence": 1-10,
+      "reasoning": "2-4 sentences explaining the decision."
+    }}
     """
     return prompt
 

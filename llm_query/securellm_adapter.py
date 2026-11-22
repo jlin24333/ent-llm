@@ -45,6 +45,21 @@ class ModelConfig:  # pylint: disable=too-few-public-methods
     DEFAULT_TIMEOUT = 120  # seconds (increased for Gemini and other slow models)
     MAX_RETRIES = 3
     RETRY_DELAY = 5  # seconds
+    MAX_OUTPUT_TOKENS = 3000  # matches manuscript Methods
+
+
+# Single list of models used by cli.py and cli_ablation.py.
+# Every name must exist in securellm's SECURE_MODEL_REGISTRY.
+AVAILABLE_MODELS = [
+    "apim:llama-3.3-70b",
+    "apim:claude-3.7",
+    "apim:gpt-4.1",
+    "apim:gemini-2.5-pro-preview-05-06",
+    # TODO: add newer models once names are confirmed in SECURE_MODEL_REGISTRY, e.g.
+    # "<NEW_GPT_NAME>",
+    # "<NEW_CLAUDE_NAME>",
+    # "<NEW_GEMINI_NAME>",
+]
 
 
 def _initialize_secure_client():

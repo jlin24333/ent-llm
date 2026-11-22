@@ -20,21 +20,13 @@ from typing import Optional
 
 import pandas as pd
 
-from llm_query.securellm_adapter import ModelConfig, query_llm, SecureLLMClient
+from llm_query.securellm_adapter import AVAILABLE_MODELS, ModelConfig, query_llm, SecureLLMClient
 from llm_query.LLM_analysis import (
     generate_prompt,
     parse_llm_response,
     process_llm_cases,
     run_llm_analysis,
 )
-
-# Available LLM models
-AVAILABLE_MODELS = [
-    "apim:llama-3.3-70b",
-    "apim:claude-3.7",
-    "apim:gpt-4.1",
-    "apim:gemini-2.5-pro-preview-05-06",
-]
 
 
 def setup_logging(verbose: bool = False) -> None:

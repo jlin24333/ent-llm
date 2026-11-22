@@ -49,6 +49,11 @@ CONFIDENCE_BINS = {
 def load_predictions(path: str) -> pd.DataFrame:
     """Load LLM predictions and normalize the decision column to boolean."""
     df = pd.read_csv(path, usecols=["llm_caseID", "decision", "confidence"])
+    # Exclude failed responses (no decision) instead of counting them as "No"
+    n_missing = df["decision"].isna().sum()
+    if n_missing:
+        print(f"Excluding {n_missing} cases with no decision from {path}")
+    df = df.dropna(subset=["decision"])
     df["predicted"] = df["decision"].str.strip().str.lower() == "yes"
     df["confidence"] = pd.to_numeric(df["confidence"], errors="coerce")
     return df
@@ -93,7 +98,10 @@ def compute_metrics(y_true, y_pred, confidence=None) -> dict:
     auc = None
     if confidence is not None:
         try:
-            auc = roc_auc_score(y_true, confidence)
+            # Signed score: "Yes" -> +confidence, "No" -> -confidence (higher = more likely surgery)
+            ok = confidence.notna()
+            score = np.where(y_pred[ok] == 1, confidence[ok], -confidence[ok])
+            auc = roc_auc_score(y_true[ok], score)
         except ValueError:
             pass
 
@@ -555,10 +563,12 @@ def plot_roc_curves(all_merged: dict[str, pd.DataFrame], plot_dir: str) -> None:
     fig, ax = plt.subplots(figsize=(7, 6))
 
     for label, merged in all_merged.items():
-        y_true = merged["actual"].astype(int)
-        conf = merged["confidence"]
-        if conf.isna().all():
+        merged = merged[merged["confidence"].notna()]
+        if merged.empty:
             continue
+        y_true = merged["actual"].astype(int)
+        # Signed score: "Yes" -> +confidence, "No" -> -confidence (higher = more likely surgery)
+        conf = np.where(merged["predicted"], merged["confidence"], -merged["confidence"])
         try:
             fpr, tpr, _ = roc_curve(y_true, conf)
             auc = roc_auc_score(y_true, conf)

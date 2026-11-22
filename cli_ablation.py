@@ -22,15 +22,7 @@ from llm_query.ablation_analysis import (
     run_ablation_experiment,
     stratified_sample,
 )
-from llm_query.securellm_adapter import ModelConfig
-
-# Available LLM models (same as cli.py)
-AVAILABLE_MODELS = [
-    "apim:llama-3.3-70b",
-    "apim:claude-3.7",
-    "apim:gpt-4.1",
-    "apim:gemini-2.5-pro-preview-05-06",
-]
+from llm_query.securellm_adapter import AVAILABLE_MODELS, ModelConfig
 
 
 def setup_logging(verbose: bool = False) -> None:
